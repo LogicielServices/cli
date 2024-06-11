@@ -548,6 +548,7 @@ template <typename ASIOLIB>
 class CliGenericTelnetServer : public Server<ASIOLIB>
 {
 public:
+    using RemoteEndpointCallback = std::function<void(const asiolib::ip::tcp::endpoint&)>;
     CliGenericTelnetServer(Cli& _cli, GenericAsioScheduler<ASIOLIB>& _scheduler, unsigned short port, std::size_t _historySize=100 ) :
         Server<ASIOLIB>(_scheduler.AsioContext(), port),
         scheduler(_scheduler),
@@ -570,8 +571,18 @@ public:
     {
         exitAction = action;
     }
+
+    void RegisterRemoteEndpointCallback(RemoteEndpointCallback callback)
+    {
+        remoteEndpointCallback = callback;
+    }
+
     std::shared_ptr<Session> CreateSession(asiolib::ip::tcp::socket _socket) override
     {
+        auto clientEndpoint = _socket.remote_endpoint();
+        if (remoteEndpointCallback) {
+            remoteEndpointCallback(clientEndpoint);
+        }
         return std::make_shared<CliTelnetSession>(scheduler, std::move(_socket), cli, exitAction, historySize);
     }
 private:
@@ -580,6 +591,7 @@ private:
     std::function< void(std::ostream&)> enterAction;
     std::function< void(std::ostream&)> exitAction;
     std::size_t historySize;
+    RemoteEndpointCallback remoteEndpointCallback;
 };
 
 
